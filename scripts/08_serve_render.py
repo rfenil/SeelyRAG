@@ -27,6 +27,42 @@ def data_ready() -> bool:
     return all(path.exists() for path in REQUIRED_PATHS)
 
 
+def find_data_root(root: Path) -> Path | None:
+    """Find a directory containing the required demo data layout."""
+    candidates = [root / "data", *root.rglob("data")]
+    for candidate in candidates:
+        if (candidate / "02_processed" / "chunks.jsonl").exists() and (
+            candidate / "03_index" / "chunks.lance"
+        ).exists():
+            return candidate
+    return None
+
+
+def install_extracted_data(extracted_root: Path) -> None:
+    """Move extracted demo data into the repository's ``data`` directory."""
+    source = find_data_root(extracted_root)
+    if source is None:
+        sample = sorted(
+            str(path.relative_to(extracted_root))
+            for path in extracted_root.rglob("*")
+            if path.is_file()
+        )[:20]
+        raise RuntimeError(
+            "RAG data bundle extracted, but no data/02_processed + data/03_index layout "
+            f"was found. First files seen: {sample}"
+        )
+
+    if source.resolve() == DATA_ROOT.resolve():
+        return
+
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    for dirname in ("02_processed", "03_index"):
+        destination = DATA_ROOT / dirname
+        if destination.exists():
+            shutil.rmtree(destination)
+        shutil.copytree(source / dirname, destination)
+
+
 def ensure_data() -> None:
     """Download and extract the hosted data bundle if the data tree is missing."""
     if data_ready():
@@ -56,11 +92,18 @@ def ensure_data() -> None:
                 shutil.copyfileobj(response, handle)
 
         print("Extracting RAG data bundle...", flush=True)
+        extract_root = Path(tmp) / "extracted"
+        extract_root.mkdir()
         with zipfile.ZipFile(archive) as bundle:
-            bundle.extractall(REPO_ROOT)
+            bundle.extractall(extract_root)
+        install_extracted_data(extract_root)
 
     if not data_ready():
-        raise RuntimeError("RAG data bundle extracted, but required files are still missing.")
+        missing = [str(path.relative_to(REPO_ROOT)) for path in REQUIRED_PATHS if not path.exists()]
+        raise RuntimeError(
+            "RAG data bundle extracted, but required files are still missing: "
+            + ", ".join(missing)
+        )
 
 
 def main() -> int:
