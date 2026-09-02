@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import sys
 import tempfile
 import urllib.request
@@ -43,7 +44,16 @@ def ensure_data() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp) / "seeley-rag-data.zip"
         print(f"Downloading RAG data bundle: {url}", flush=True)
-        urllib.request.urlretrieve(url, archive)
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 SeeleyRAGDemo/0.1",
+                "Accept": "application/zip,application/octet-stream,*/*",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=300) as response:
+            with archive.open("wb") as handle:
+                shutil.copyfileobj(response, handle)
 
         print("Extracting RAG data bundle...", flush=True)
         with zipfile.ZipFile(archive) as bundle:
