@@ -1,0 +1,21 @@
+# flake8 cannot read pyproject.toml, so it gets its own file.
+[flake8]
+max-line-length = 100
+# E203 (whitespace before ':') and W503 (line break before binary operator)
+# both conflict with black's formatting. Everything else stays on.
+extend-ignore = E203, W503
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info,
+    data,
+    _context
+per-file-ignores =
+    # Re-exports in package __init__ files are not unused imports.
+    src/seeley_rag/__init__.py:F401
+    src/seeley_rag/acquire/__init__.py:F401
+max-complexity = 12

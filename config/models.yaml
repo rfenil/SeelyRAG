@@ -1,0 +1,66 @@
+# Seeley product-family and model-code lexicon. build-plan.md section 3.4.
+#
+# WHY THIS FILE EXISTS: a TQ fault code answered from a Climate Wizard manual is
+# the failure that permanently destroys installer trust (build-plan section 13,
+# risk 3). Folder and category names give product_family at near-perfect accuracy
+# for zero LLM cost; article titles carry the model codes. This file is the
+# backbone of retrieval filtering.
+#
+# Hand-maintained. Add a code the moment you see it in a title the crawl returns.
+# Stage 1 records category/folder verbatim in the manifest; nothing consumes the
+# mapping below until Stage 3.
+
+families:
+  DGH:
+    name: "Ducted Gas Heating"
+    aliases: ["ducted gas", "gas ducted", "gas heater", "ducted heater", "heating"]
+    model_codes: ["TQ", "TQM", "TG", "TH", "THM", "TE", "TX", "TA", "TA3", "TA4",
+                  "TA5", "TB3", "TE4", "TE5", "MagIQtouch"]
+    category_patterns: ["Ducted Gas Heating", "DGH"]
+
+  RC:
+    name: "Reverse Cycle"
+    aliases: ["reverse cycle", "split system", "heat pump", "air conditioner", "ducted rc"]
+    model_codes: ["CQ3", "CQ4", "RC", "SRC"]
+    category_patterns: ["Reverse Cycle", "Add On Cooling"]
+
+  EVAP:
+    name: "Evaporative Cooling"
+    aliases: ["evap", "evaporative", "breezair", "coolair", "climate wizard"]
+    model_codes: ["EA", "EPX", "EXH", "EXQ", "TBA", "TBQ", "CW", "CW3", "CW6", "CW-6S"]
+    category_patterns: ["Evaporative", "Breezair", "Coolair", "Climate Wizard"]
+
+  VRF:
+    name: "VRF Reverse Cycle"
+    # Added after the full crawl: 111 article titles reference VRF, and without
+    # this family every one of them resolved to UNKNOWN -- no product routing at
+    # all for a whole category. build-plan section 13, risk 3.
+    aliases: ["vrf", "mini vrf", "multi head", "multi-head", "bulk-head", "bulk head", "dominator"]
+    model_codes: ["MCMX", "MCHX", "MCRX", "MCSX", "MDHV", "SDHV", "KDHV", "KDHA", "XE70", "XE71", "LE60"]
+    category_patterns: ["VRF Reverse Cycle", "VRF"]
+
+  CONTROLS:
+    name: "Controls and Thermostats"
+    aliases: ["controller", "thermostat", "wall control", "magiqtouch"]
+    model_codes: ["MagIQtouch", "MT", "Icon"]
+    category_patterns: ["Controls", "MagIQtouch", "Thermostat"]
+
+# Folder-name to document-type mapping. Folders are the cheapest, most reliable
+# metadata in the corpus — take all of it.
+doc_types:
+  service_guide: ["Service Guide", "Service Manual", "Service"]
+  installation: ["Installation", "Install", "Owner Installation"]
+  owner_manual: ["Owner", "User Manual", "Operating"]
+  spare_parts: ["Spare Parts", "Parts", "Exploded"]
+  fault_finding: ["Fault", "Diagnostic", "Troubleshoot", "Error Code", "Fault Finding"]
+  technical_bulletin: ["Bulletin", "Technical Bulletin", "Service Bulletin"]
+  warranty: ["Warranty", "Claim"]
+
+# Fault-code patterns. build-plan section 5.3. Vector search is bad at codes:
+# E:04 and E:05 are near-identical in embedding space and catastrophically
+# different in meaning. These feed the separate exact-lookup code table.
+fault_code_patterns:
+  - '\b[EFH][\s:.-]?\d{1,2}\b'
+  - '\bfault\s+code\s+(\w+)\b'
+  - '\berror\s+code\s+(\w+)\b'
+  - '\b\d{1,2}\s+flash(?:es)?\b'

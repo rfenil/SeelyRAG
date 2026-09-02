@@ -1,0 +1,31 @@
+# Runtime dependencies for the stages that are IMPLEMENTED (Stage 0 triage,
+# Stage 1 acquire, Stage 2 parse, Stage 3 chunk). Pinned to minor. Installed by `make install`.
+#
+# Downstream stages (index / retrieve / generate / api) are stubs, so
+# their dependencies are declared as the `downstream` optional extra in
+# pyproject.toml and deliberately NOT installed yet. Install them when Stage 4
+# work begins:  pip install -e ".[downstream]"
+
+httpx~=0.27.0
+selectolax~=0.3.21
+tenacity~=8.5.0
+# Lower bounds, not `~=` pins. The `~=2.8.0` pin conflicted with FastAPI's
+# resolution in Stage 7, and the same class of stale pin already broke the
+# Stage 3 and Stage 4 installs (ADR 0006). Verified against 2.13.
+pydantic>=2.8,<3
+pydantic-settings>=2.4,<3
+PyYAML~=6.0.1
+rich~=13.7.1
+
+# PyMuPDF backs parse/triage.py, which IS implemented.
+# NOTE: AGPL-3.0. Fine for a POC; must be resolved -- commercial licence or a
+# swap to pypdfium2 + pdfplumber -- before this is served outside the org.
+# build-plan.md section 14, item 2.
+pymupdf~=1.24.9
+
+# Chunk sizing must match the embedding model's own tokeniser: a table chunk
+# measured wrongly does not degrade, it 400s at the 8,191-token hard cap.
+# >=0.9 is the first release with cp313 wheels; 0.7 tries to build from source.
+# tokens.py falls back to a character estimate if the BPE table can't be loaded,
+# so the test suite never needs the network.
+tiktoken>=0.9,<0.13

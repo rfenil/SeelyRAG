@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seeley Installer Assistant</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Seeley Installer Assistant</h1>
+      <p id="health">Checking service...</p>
+    </div>
+    <nav>
+      <button class="tab active" data-tab="ask">Ask</button>
+      <button class="tab" data-tab="search">Search</button>
+      <button class="tab" data-tab="docs">Docs</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="ask-panel" class="panel active">
+      <form id="ask-form" class="query-form">
+        <textarea id="ask-query" rows="3" placeholder="TQ heater showing FC7, what do I check?"></textarea>
+        <div class="controls">
+          <select id="ask-family" aria-label="Product family">
+            <option value="">Auto family</option>
+            <option value="DGH">DGH</option>
+            <option value="RC">RC</option>
+            <option value="EVAP">EVAP</option>
+            <option value="CONTROLS">CONTROLS</option>
+          </select>
+          <label>
+            Top K
+            <input id="ask-top-k" type="number" min="1" max="50" value="8">
+          </label>
+          <button type="submit">Ask</button>
+        </div>
+      </form>
+      <section id="answer" class="answer empty">No answer yet.</section>
+    </section>
+
+    <section id="search-panel" class="panel">
+      <form id="search-form" class="query-form">
+        <textarea id="search-query" rows="2" placeholder="manifold gas pressure TQ natural gas"></textarea>
+        <div class="controls">
+          <select id="search-family" aria-label="Product family filter">
+            <option value="">Any family</option>
+            <option value="DGH">DGH</option>
+            <option value="RC">RC</option>
+            <option value="EVAP">EVAP</option>
+            <option value="CONTROLS">CONTROLS</option>
+          </select>
+          <select id="search-doc-type" aria-label="Document type filter">
+            <option value="">Any type</option>
+            <option value="service_guide">Service guide</option>
+            <option value="installation">Installation</option>
+            <option value="diagnostic">Diagnostic</option>
+          </select>
+          <label>
+            Tables
+            <select id="search-table">
+              <option value="">Any</option>
+              <option value="true">Only</option>
+              <option value="false">Exclude</option>
+            </select>
+          </label>
+          <label>
+            Top K
+            <input id="search-top-k" type="number" min="1" max="50" value="8">
+          </label>
+          <button type="submit">Search</button>
+        </div>
+      </form>
+      <section id="search-results" class="results empty">No search yet.</section>
+    </section>
+
+    <section id="docs-panel" class="panel">
+      <div class="controls docs-controls">
+        <input id="doc-filter" type="search" placeholder="Filter documents">
+        <button id="refresh-docs" type="button">Refresh</button>
+      </div>
+      <section id="docs-results" class="results empty">No inventory loaded.</section>
+    </section>
+  </main>
+
+  <template id="citation-template">
+    <article class="citation">
+      <div class="citation-body"></div>
+      <img class="page-image" alt="">
+    </article>
+  </template>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+# SME question set — template and brief
+#
+# Specified by _context/01-plan/build-plan.md section 10.
+#
+# ============================================================================
+# THIS IS DAY 0, ITEM ONE. It is the only critical-path item we do not control,
+# so it is sent to the SME before any code is written. Without it, Day 3 ends
+# unable to say whether the system works.
+# ============================================================================
+#
+# TARGET: 60 questions.
+#
+# Coverage mix:
+#   ~40%  fault diagnosis
+#   ~25%  installation / commissioning
+#   ~15%  spec lookup (clearances, gas pressures, electrical)
+#   ~10%  "show me the diagram"
+#   ~10%  UNANSWERABLE from the corpus
+#
+# That last 10% matters more than people expect. A system that confidently
+# invents an answer for a model it has never seen is worse than no system,
+# because a licensed installer may act on it. We need cases that SHOULD be
+# refused in order to measure whether they are.
+#
+# ----------------------------------------------------------------------------
+# THE ONE THING TO GET RIGHT: expected_page
+# ----------------------------------------------------------------------------
+# `expected_page` is the **PRINTED page number on the page itself** — the one
+# you read off the bottom of the page — NOT the PDF viewer's page counter.
+#
+# Service manuals have front matter, so these routinely differ by 4-10. If some
+# answers use one and some the other, page accuracy fails corpus-wide for a
+# reason that looks exactly like a retrieval bug, and a day gets burned chasing
+# it. When in doubt, write down the printed number and say so in `notes`.
+#
+# (Measured caveat: the manuals sampled so far expose no embedded page labels,
+# so this reconciliation is entirely on us. See 03-research/portal-recon.md §6.)
+# ----------------------------------------------------------------------------
+#
+# Fields:
+#   id              required  unique slug, {family}-{nnn}
+#   question        required  as an installer would actually phrase it
+#   category        required  fault_diagnosis | installation | spec_lookup
+#                             | diagram | unanswerable
+#   product_family  required  DGH | RC | EVAP | CONTROLS
+#   model           optional  model code, e.g. TQ, THM, CQ4
+#   expected_source optional  filename or article title that should be cited
+#   expected_page   optional  PRINTED page number (omit for article sources)
+#   must_mention    optional  phrases a correct answer has to contain
+#   must_not_say    optional  phrases that indicate a wrong or unsafe answer
+#   notes           optional  anything the grader should know
+#
+# Leave a field out rather than guessing at it. A blank is honest; a guess
+# becomes a false failure we spend hours investigating.
+
+questions:
+  # -- fault diagnosis --------------------------------------------------------
+  - id: dgh-001
+    question: "TQ heater showing FC7, what do I check?"
+    category: fault_diagnosis
+    product_family: DGH
+    model: TQ
+    expected_source: "644066-M MANUAL SERVICE TQ SERIES.pdf"
+    expected_page: 42          # PRINTED number, not the PDF page count
+    must_mention:
+      - "flame"
+      - "ignition"
+    must_not_say:
+      - "replace the gas valve first"
+    notes: >
+      There is also a diagnostic article covering FC7. Either source is
+      acceptable; citing both is ideal.
+
+  - id: dgh-002
+    question: "Braemar ducted heater keeps locking out after three ignition attempts"
+    category: fault_diagnosis
+    product_family: DGH
+    must_mention:
+      - "lockout"
+    notes: "Deliberately vague, and does not name a model. Tests soft product routing."
+
+  # -- installation / commissioning -------------------------------------------
+  - id: dgh-010
+    question: "What clearances do I need around a TQ series indoor unit?"
+    category: installation
+    product_family: DGH
+    model: TQ
+    expected_source: "644066-M MANUAL SERVICE TQ SERIES.pdf"
+    expected_page:             # fill in the PRINTED number
+    must_mention:
+      - "clearance"
+
+  # -- spec lookup ------------------------------------------------------------
+  - id: dgh-020
+    question: "What's the correct manifold gas pressure for a TQ on natural gas?"
+    category: spec_lookup
+    product_family: DGH
+    model: TQ
+    expected_page:
+    notes: >
+      Exact-value question. The answer must quote the figure verbatim, with its
+      units. A rounded or paraphrased number counts as WRONG — this is the class
+      of answer an installer acts on directly.
+
+  # -- diagram ----------------------------------------------------------------
+  - id: dgh-030
+    question: "Show me the wiring diagram for the TQ series"
+    category: diagram
+    product_family: DGH
+    model: TQ
+    expected_page:
+    notes: >
+      Must return a page image, not only prose. Grading checks that a page
+      image accompanies the citation.
+
+  # -- unanswerable (~10% of the set) -----------------------------------------
+  - id: unans-001
+    question: "What's the fault code for a Daikin Altherma heat pump showing U4?"
+    category: unanswerable
+    product_family: DGH
+    notes: >
+      Another manufacturer entirely. A correct response DECLINES and says the
+      corpus does not cover it. Any confident answer is a failure, however
+      plausible it sounds.
+
+  - id: unans-002
+    question: "What's the warranty period on a TQ heater installed in New Zealand?"
+    category: unanswerable
+    product_family: DGH
+    notes: >
+      Plausible-sounding but not in the pilot corpus. Should decline, and ideally
+      name which document would have covered it.
+
+  # -- reverse cycle ----------------------------------------------------------
+  - id: rc-001
+    question: "CQ4 reverse cycle unit not cooling, where do I start?"
+    category: fault_diagnosis
+    product_family: RC
+    model: CQ4
+
+  # ---------------------------------------------------------------------------
+  # Add the remaining questions below, keeping to the coverage mix above.
+  # ---------------------------------------------------------------------------

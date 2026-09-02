@@ -1,0 +1,189 @@
+# Seeley Installer RAG — non-secret configuration.
+# Secrets live in .env (see .env.example). Env vars prefixed SEELEY_ override
+# the values here; see src/seeley_rag/settings.py.
+
+project:
+  name: seeley-rag
+  crawler_version: "0.1.0"
+
+# ---------------------------------------------------------------------------
+# Stage 1 — acquisition. build-plan.md section 3.
+# These numbers are crawl etiquette, not tuning knobs. Raising rps or adding
+# concurrency risks a block, and with no API key a block ends the project.
+# ---------------------------------------------------------------------------
+crawl:
+  base_url: "https://seeleyinternationalhelp.freshdesk.com"
+  solutions_path: "/support/solutions"
+  # 1 request/second, single-threaded. ~900 articles + ~600 PDFs is ~25 min.
+  rps: 1.0
+  timeout_seconds: 30.0
+  max_retries: 3               # 5xx and timeouts only. Never on 429/403.
+  retry_backoff_seconds: 2.0
+  max_pages_per_folder: 50     # pagination safety stop
+  user_agent_template: "SeeleyInstallerBot/{version} (+{contact})"
+  contact: "shlok@rostered.ai"
+  # robots.txt paths that must be crawlable or acquisition is dead (section 3.0).
+  required_paths:
+    - "/support/solutions"
+    - "/support/solutions/articles"
+    - "/helpdesk/attachments"
+
+# Pilot scope: the two densest categories, ~326 articles. build-plan section 1.
+#
+# Matched as case-insensitive SUBSTRINGS of the portal's category names, which
+# are long and shouty ("DUCTED GAS HEATING (DGH) SERVICE AND INSTALLATION").
+# Shorten an entry to broaden the match; lengthen it to narrow.
+#
+# "Reverse Cycle" alone also matches "VRF REVERSE CYCLE SERVICE AND
+# INSTALLATION" -- a separate commercial product line that would add ~123
+# articles beyond the intended pilot. The longer form below excludes it.
+pilot_categories:
+  - "Ducted Gas Heating (DGH)"
+  - "Reverse Cycle Service and Installation"
+
+# ---------------------------------------------------------------------------
+# Article triage at acquisition time. build-plan section 4.4.
+# A body under this length WITH an attachment is a card-catalogue stub: its
+# text is worthless, its metadata decorates the PDF's chunks.
+# ---------------------------------------------------------------------------
+articles:
+  stub_max_body_chars: 200
+  # Seeley appended a 1026-character safety notice to article bodies some time
+  # after the build plan was written. It is byte-identical across articles, so
+  # it inflates every stub past the 200-char threshold and would misclassify
+  # ~900 card-catalogue articles as real content. Strip it BEFORE classifying.
+  # Each marker pair removes the span from `start` to the end of `end`.
+  # Verified: TQ stub 1087 -> 60 chars; FC7 diagnostic 3101 -> 2074 chars.
+  boilerplate_markers:
+    - start: "Safety Notice"
+      end: "until the risks have been adequately controlled."
+
+# ---------------------------------------------------------------------------
+# Stage 0 — PDF triage. build-plan section 4.1.
+# ---------------------------------------------------------------------------
+triage:
+  text_layer_min_chars: 100      # below this, the page is scanned
+  diagram_heavy_max_chars: 600   # has text but is picture-dominated
+  diagram_heavy_min_images: 1
+
+paths:
+  data_root: "data"
+
+logging:
+  level: "INFO"
+  format: "json"          # "json" for machine-readable lines, "console" for humans
+
+parse:
+  render_dpi: 150
+
+# ---------------------------------------------------------------------------
+# Stage 3 — chunking. build-plan section 5.1.
+# ---------------------------------------------------------------------------
+chunk:
+  target_tokens: 800
+  max_tokens: 1200
+  overlap_tokens: 120
+  # NOT a tuning knob. text-embedding-3-large hard-caps at 8,191 tokens and
+  # Cohere rerank truncates near 4,000. A table above this cap fails to embed,
+  # on exactly the fault-code content the system exists to answer from.
+  table_max_tokens: 6000
+  # 897 pages in the corpus are near-empty scan artefacts. Chunking them would
+  # put citable-but-contentless rows in the index.
+  min_chunk_chars: 50
+
+# ---------------------------------------------------------------------------
+# Stage 4 — indexing. build-plan section 6.
+# ---------------------------------------------------------------------------
+index:
+  embedding_model: "text-embedding-3-large"
+  # The model's native width. Truncating to 1024 would shrink the index ~3x at
+  # the same price, but costs measurable recall — accuracy is the binding
+  # constraint, so the trade stays a config change the eval can measure.
+  embedding_dim: 3072
+  batch_size: 256
+  table_name: "chunks"
+
+# ---------------------------------------------------------------------------
+# Stage 5 - retrieval. build-plan section 7.2.
+#
+# The boosts are multipliers on the FUSED score and are applied BEFORE
+# truncation. Applied after reranking to top-8 they could not promote anything
+# into the list, which is the bug the plan calls out.
+# ---------------------------------------------------------------------------
+retrieve:
+  dense_top_k: 30
+  bm25_top_k: 30
+  rrf_k: 60
+  rerank_top_k: 8
+  # Diagnostic articles are installer-written prose about real faults; they are
+  # disproportionately valuable per byte relative to manual pages.
+  diagnostic_article_boost: 1.2
+  # Soft, never a filter. A misclassified family must cost a chunk some rank,
+  # not remove it from consideration (build-plan section 7.1).
+  product_family_boost: 1.35
+  model_series_boost: 1.15
+  # A chunk carrying a fault code the query named. Codes are the strongest exact
+  # signal in the corpus.
+  code_match_boost: 1.5
+  # Fault-code table hits pinned ahead of retrieval, at most this many.
+  # 6 rather than 3: a code named without a product pins every family's meaning,
+  # and FC02 alone has four rows. At 3 the enumeration silently truncates, which
+  # is the failure it exists to prevent.
+  max_pinned_codes: 6
+
+  # --- Optional LLM steps. Both cost latency and money; both are off. -----
+  # Rewrite the query before searching.
+  #
+  # ON as of 2026-08-31. It was off because the deterministic pass already
+  # gives family, models and codes -- true of a well-formed query, false of the
+  # ones installers actually type. Measured over the novice set
+  # (scripts/10_novice_queries.py): 'cooler smells' went from reverse-cycle
+  # owners manuals to the right evaporative ones, 'gas presure tq5' from a sales
+  # guide to the gas-valve pressure pages. Cost ~1.5-1.8s, not the 1-4s first
+  # measured.
+  #
+  # The rewrite may NOT name a product the query did not: on a bare 'fc7' it
+  # used to invent one family and on 'fc 7' the opposite one, laundering a guess
+  # into confident retrieval. Ambiguity is the code lookup's job, not its.
+  use_query_llm: true
+  # Listwise reranking when no Cohere key exists. build-plan 7.2 warns this
+  # roughly doubles per-query cost, so Cohere is preferred where available.
+  #
+  # ON as of 2026-08-31, measured over the 17 distinct questions in the query
+  # log (scripts/09_rerank_ab.py): median +0.92s, 11 of 17 lists changed, 5 of
+  # 17 changed their first result, and the 4 queries the deterministic pass
+  # already settles were left untouched. On gpt-4.1-mini the "roughly doubles"
+  # warning does not hold -- that figure was written against a larger model.
+  #
+  # This is NOT production-readiness B-4 closed. That gate is accuracy, and
+  # accuracy needs the SME question set (A-3); movement is not improvement.
+  # Reverting is this one line.
+  use_llm_rerank: true
+  llm_rerank_candidates: 20
+  # Model for the listwise reranker. Unset inherits generate.router_model,
+  # which was picked for latency, not judgement -- name one here to change that
+  # without also slowing the query router down.
+  llm_rerank_model: null
+
+# ---------------------------------------------------------------------------
+# Stubbed stages. Declared for stability; nothing reads these yet.
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Stage 6 - generation, and the Stage 5 query router. build-plan sections 7.1
+# and 8.
+#
+# The build plan names Claude. Nothing in the architecture requires it, and the
+# OpenAI key already in use for embeddings covers generation, routing and the
+# outstanding Stage 2b vision work on one account. Set provider: "anthropic"
+# and the Claude model names to switch back; see ADR 0008.
+# ---------------------------------------------------------------------------
+generate:
+  provider: "openai"          # "openai" | "anthropic"
+  model: "gpt-5"              # generation: quality over latency
+  # Router: latency over quality, and measured against this key --
+  # gpt-4.1-mini 1.0s, gpt-5-nano 1.5s at minimal effort, gpt-5-mini 8.3s at
+  # default effort. The router is optional; query understanding works without it.
+  router_model: "gpt-4.1-mini"
+  # Only the gpt-5 and o-series families read this. They reason by default,
+  # which a routing decision does not need and an installer should not wait for.
+  reasoning_effort: "minimal"

@@ -1,0 +1,110 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seeley-rag"
+version = "0.1.0"
+description = "RAG over Seeley International's installer help centre, cited to the exact manual page."
+requires-python = ">=3.11"
+readme = "README.md"
+authors = [{ name = "Rostered AI", email = "shlok@rostered.ai" }]
+dynamic = ["dependencies"]
+
+# Dependencies of Stage 4 and the still-stubbed stages after it. Not installed
+# by `make init`: Stages 0-3 need none of them, and pulling ~1 GB of ML wheels
+# to scaffold a crawl would be a slow, fragile no-op.
+# Install when Stage 4 begins: pip install -e ".[downstream]"
+#
+# Lower bounds, not `~=` pins. The original pins were written before Python
+# 3.13 and every one of them resolved to a release with no cp313 wheel, so pip
+# fell back to building numpy from source and the install failed outright.
+# These are the floors that actually carry wheels on 3.13.
+[project.optional-dependencies]
+downstream = [
+    "lancedb>=0.24",          # vector + native Rust FTS + merge_insert upsert
+    "openai>=1.60",
+    "anthropic>=0.40",
+    "cohere>=5.11",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "pandas>=2.2.3",          # first release with cp313 wheels
+]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+seeley_rag = ["api/static/*"]
+
+# ---------------------------------------------------------------------------
+# black — line length 100 (see also .flake8, which must agree)
+# ---------------------------------------------------------------------------
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+extend-exclude = '''
+/(
+    \.venv
+  | data
+  | _context
+)/
+'''
+
+# ---------------------------------------------------------------------------
+# isort — profile "black" so the two tools never fight
+# ---------------------------------------------------------------------------
+[tool.isort]
+profile = "black"
+line_length = 100
+src_paths = ["src", "tests", "scripts"]
+known_first_party = ["seeley_rag"]
+skip_glob = [".venv/*", "data/*", "_context/*"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+# importlib import mode lets same-named test modules coexist in different
+# directories (tests/acquire/test_base.py and tests/parse/test_base.py both
+# exist, mirroring the two base.py modules they cover).
+addopts = "-q --strict-markers --strict-config --import-mode=importlib"
+markers = [
+    "network: test would touch the network (must never be used; kept as a tripwire)",
+]
+filterwarnings = ["error::DeprecationWarning:seeley_rag.*"]
+
+[tool.coverage.run]
+branch = true
+source = ["seeley_rag"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+files = ["src/seeley_rag"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["selectolax.*", "fitz.*"]
+ignore_missing_imports = true

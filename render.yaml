@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: seeley-rag-demo
+    env: python
+    plan: free
+    buildCommand: pip install -e ".[downstream]"
+    startCommand: python scripts/08_serve_render.py --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PAGE_IMAGE_BASE_URL
+        sync: false
+      - key: SEELEY_DATA_BUNDLE_URL
+        sync: false
