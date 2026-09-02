@@ -63,6 +63,22 @@ def install_extracted_data(extracted_root: Path) -> None:
         shutil.copytree(source / dirname, destination)
 
 
+def extract_bundle(archive: Path, destination: Path) -> None:
+    """Extract a zip bundle, normalising Windows member paths on Linux."""
+    destination = destination.resolve()
+    with zipfile.ZipFile(archive) as bundle:
+        for member in bundle.infolist():
+            name = member.filename.replace("\\", "/").lstrip("/")
+            if not name or name.endswith("/"):
+                continue
+            target = (destination / name).resolve()
+            if destination not in target.parents:
+                raise RuntimeError(f"Refusing to extract unsafe bundle member: {member.filename}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with bundle.open(member) as source, target.open("wb") as handle:
+                shutil.copyfileobj(source, handle)
+
+
 def ensure_data() -> None:
     """Download and extract the hosted data bundle if the data tree is missing."""
     if data_ready():
@@ -94,8 +110,7 @@ def ensure_data() -> None:
         print("Extracting RAG data bundle...", flush=True)
         extract_root = Path(tmp) / "extracted"
         extract_root.mkdir()
-        with zipfile.ZipFile(archive) as bundle:
-            bundle.extractall(extract_root)
+        extract_bundle(archive, extract_root)
         install_extracted_data(extract_root)
 
     if not data_ready():
